@@ -1,5 +1,4 @@
-let graph, graphCanvas, bfsTraversal, currentStepIndex, autoTimer, selectedMovieId;
-let allRecommendations = [];
+let graph, selectedMovieId;
 
 const GENRE_COLORS = {
   'Sci-Fi':    { bg: '#E1F3FE', text: '#1F6C9F' },
@@ -42,11 +41,25 @@ function initGraph() {
   for (const [a, b] of GRAPH_EDGES) graph.addEdge(a, b);
 }
 
+function renderGenreFilters() {
+  const ordered = ['All', 'Sci-Fi', 'Crime', 'Drama', 'Thriller', 'Action', 'Animation', 'Horror', 'Romance', 'Comedy', 'War'];
+  const filters = document.getElementById('genreFilters');
+  filters.innerHTML = ordered.map(g => `
+    <button class="genre-filter ${g === 'All' ? 'active' : ''}" data-genre="${g}">${g}</button>
+  `).join('');
+
+  filters.querySelectorAll('.genre-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      filters.querySelectorAll('.genre-filter').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderMovieGrid(btn.dataset.genre);
+    });
+  });
+}
+
 function renderMovieGrid(filter = 'All') {
   const grid = document.getElementById('movieGrid');
-  const movies = MOVIES_DATA.filter(m =>
-    filter === 'All' || m.genres.includes(filter)
-  );
+  const movies = MOVIES_DATA.filter(m => filter === 'All' || m.genres.includes(filter));
 
   grid.innerHTML = movies.map(m => `
     <div class="movie-card ${selectedMovieId === m.id ? 'selected' : ''}"
@@ -66,38 +79,16 @@ function renderMovieGrid(filter = 'All') {
   });
 }
 
-function renderGenreFilters() {
-  const genres = ['All', ...new Set(MOVIES_DATA.flatMap(m => m.genres))].sort();
-  genres.splice(genres.indexOf('All'), 1);
-  const ordered = ['All', 'Sci-Fi', 'Crime', 'Drama', 'Thriller', 'Action', 'Animation', 'Horror', 'Romance', 'Comedy', 'War'];
-  const filters = document.getElementById('genreFilters');
-  filters.innerHTML = ordered.map(g => `
-    <button class="genre-filter ${g === 'All' ? 'active' : ''}" data-genre="${g}">${g}</button>
-  `).join('');
-
-  filters.querySelectorAll('.genre-filter').forEach(btn => {
-    btn.addEventListener('click', () => {
-      filters.querySelectorAll('.genre-filter').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      renderMovieGrid(btn.dataset.genre);
-    });
-  });
-}
-
 function selectMovie(id) {
   selectedMovieId = id;
-  stopAuto();
-
   const movie = graph.getNode(id);
 
-  // Update movie grid selection highlight
   document.querySelectorAll('.movie-card').forEach(c => {
     c.classList.toggle('selected', c.dataset.id === id);
   });
 
   // Render selected movie panel
-  const panel = document.getElementById('selectedMoviePanel');
-  panel.innerHTML = `
+  document.getElementById('selectedMoviePanel').innerHTML = `
     <div class="selected-movie-card">
       <div class="selected-movie-header">
         <div>
@@ -111,29 +102,16 @@ function selectMovie(id) {
     </div>
   `;
 
-  // Enable controls
-  document.getElementById('btnStep').disabled = false;
-  document.getElementById('btnAuto').disabled = false;
-
-  // Run BFS
-  bfsTraversal = new BFSTraversal(graph, id, 3);
-  currentStepIndex = 0;
-  graphCanvas.reset(id);
-
-  const visitedMap = bfsTraversal.getVisitedMap();
-  allRecommendations = computeRecommendations(graph, id, visitedMap);
-
-  updateBFSControls();
-  renderRecommendations([]);
-
-  // Scroll to graph section on mobile
-  document.getElementById('graphSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  // Run BFS immediately and show results
+  const bfs = new BFSTraversal(graph, id, 3);
+  const recommendations = computeRecommendations(graph, id, bfs.getVisitedMap());
+  renderRecommendations(recommendations);
 }
 
 function renderRecommendations(recs) {
   const container = document.getElementById('recommendationsList');
   if (recs.length === 0) {
-    container.innerHTML = `<div class="recs-empty">Run BFS to discover recommendations</div>`;
+    container.innerHTML = `<div class="recs-empty">No recommendations found</div>`;
     return;
   }
 
@@ -143,9 +121,10 @@ function renderRecommendations(recs) {
       <div class="rec-info">
         <div class="rec-title">${r.movie.title}</div>
         <div class="rec-meta">${r.movie.year} · ${r.movie.director}</div>
-        <div class="rec-genres">${r.sharedGenres.map(g => genreTag(g, true)).join('')}${
-          r.movie.genres.filter(g => !r.sharedGenres.includes(g)).map(g => genreTag(g)).join('')
-        }</div>
+        <div class="rec-genres">
+          ${r.sharedGenres.map(g => genreTag(g, true)).join('')}
+          ${r.movie.genres.filter(g => !r.sharedGenres.includes(g)).map(g => genreTag(g)).join('')}
+        </div>
       </div>
       <div class="rec-score-col">
         <div class="rec-score">${r.score}</div>
@@ -156,104 +135,10 @@ function renderRecommendations(recs) {
   `).join('');
 }
 
-function stepBFS() {
-  if (!bfsTraversal) return;
-  const steps = bfsTraversal.getSteps();
-  if (currentStepIndex >= steps.length) {
-    finalizeBFS();
-    return;
-  }
-  graphCanvas.applyStep(steps[currentStepIndex]);
-  currentStepIndex++;
-  updateBFSControls();
-
-  if (currentStepIndex >= steps.length) finalizeBFS();
-}
-
-function finalizeBFS() {
-  graphCanvas.applyRecommendations(allRecommendations);
-  renderRecommendations(allRecommendations);
-  updateBFSControls();
-}
-
-function startAuto() {
-  if (autoTimer) return;
-  const speed = parseInt(document.getElementById('speedRange').value);
-  document.getElementById('btnAuto').textContent = 'Pause';
-  document.getElementById('btnAuto').classList.add('active');
-  autoTimer = setInterval(() => {
-    const steps = bfsTraversal ? bfsTraversal.getSteps() : [];
-    if (currentStepIndex >= steps.length) {
-      finalizeBFS();
-      stopAuto();
-    } else {
-      stepBFS();
-    }
-  }, speed);
-}
-
-function stopAuto() {
-  clearInterval(autoTimer);
-  autoTimer = null;
-  const btn = document.getElementById('btnAuto');
-  if (btn) {
-    btn.textContent = 'Auto Play';
-    btn.classList.remove('active');
-  }
-}
-
-function resetBFS() {
-  stopAuto();
-  if (!selectedMovieId) return;
-  currentStepIndex = 0;
-  graphCanvas.reset(selectedMovieId);
-  renderRecommendations([]);
-  updateBFSControls();
-}
-
-function updateBFSControls() {
-  if (!bfsTraversal) return;
-  const steps = bfsTraversal.getSteps();
-  const counter = document.getElementById('stepCounter');
-  const btnStep = document.getElementById('btnStep');
-  const done = currentStepIndex >= steps.length;
-
-  counter.textContent = done
-    ? `Complete (${steps.length} steps)`
-    : `Step ${currentStepIndex} / ${steps.length}`;
-
-  btnStep.disabled = done;
-  btnStep.textContent = done ? 'Done' : 'Step Forward';
-}
-
-function updateGraphStats() {
-  document.getElementById('statNodes').textContent = graph.getNodeCount();
-  document.getElementById('statEdges').textContent = graph.getEdgeCount();
-}
-
 function init() {
   initGraph();
-
-  const canvasEl = document.getElementById('graphCanvas');
-  graphCanvas = new GraphCanvas(canvasEl, graph);
-  graphCanvas.onNodeClick = id => selectMovie(id);
-  graphCanvas.draw();
-
   renderGenreFilters();
   renderMovieGrid();
-  updateGraphStats();
-
-  const btnStep = document.getElementById('btnStep');
-  const btnAuto = document.getElementById('btnAuto');
-  btnStep.addEventListener('click', stepBFS);
-  btnAuto.addEventListener('click', () => {
-    if (autoTimer) stopAuto();
-    else startAuto();
-  });
-  document.getElementById('btnReset').addEventListener('click', resetBFS);
-  document.getElementById('speedRange').addEventListener('input', () => {
-    if (autoTimer) { stopAuto(); startAuto(); }
-  });
 }
 
 document.addEventListener('DOMContentLoaded', init);

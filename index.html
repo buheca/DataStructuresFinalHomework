@@ -61,59 +61,10 @@
     </div>
   </main>
 
-  <!-- Graph visualization -->
-  <section class="graph-section" id="graphSection">
-    <div class="graph-panel">
-      <div class="graph-header">
-        <h2>Graph Structure</h2>
-        <div class="graph-stats">
-          <div><span id="statNodes">—</span> nodes</div>
-          <div><span id="statEdges">—</span> edges</div>
-        </div>
-        <div class="graph-controls">
-          <button class="btn btn-primary" id="btnStep" disabled>Step Forward</button>
-          <button class="btn" id="btnAuto" disabled>Auto Play</button>
-          <button class="btn" id="btnReset">Reset</button>
-          <div class="speed-control">
-            <label for="speedRange">Speed</label>
-            <input type="range" id="speedRange" min="100" max="900" value="400" step="100">
-          </div>
-          <span id="stepCounter">Select a movie</span>
-        </div>
-      </div>
-
-      <div class="graph-legend">
-        <div class="legend-item">
-          <div class="legend-dot" style="background:#EAF2F8;border-color:#B8D4E8"></div>
-          Default node
-        </div>
-        <div class="legend-item">
-          <div class="legend-dot" style="background:#4A7FA5;border-color:#2C5F82"></div>
-          Source (selected)
-        </div>
-        <div class="legend-item">
-          <div class="legend-dot" style="background:#FFF3CD;border-color:#C9A227"></div>
-          In BFS queue
-        </div>
-        <div class="legend-item">
-          <div class="legend-dot" style="background:#A8CCE8;border-color:#5A9EC0"></div>
-          BFS visited
-        </div>
-        <div class="legend-item">
-          <div class="legend-dot" style="background:#2C5F82;border-color:#1A3F5C"></div>
-          Recommended
-        </div>
-      </div>
-
-      <canvas id="graphCanvas"></canvas>
-    </div>
-  </section>
-
   <script src="js/data.js"></script>
   <script src="js/graph.js"></script>
   <script src="js/bfs.js"></script>
   <script src="js/scoring.js"></script>
-  <script src="js/canvas.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
